@@ -1,4 +1,4 @@
-# elevenlabs-ui
+# Diatribe
 
 A [streamlit app](https://elevenlabs-dialogue.streamlit.app/) that allows you create dialogues between characters using ElevenLabs. The tool also gives you the option to edit aspects of the audio and generate plots and dialogues using OpenAI (optional).
 
