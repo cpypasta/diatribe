@@ -10,4 +10,5 @@ audio
 export
 session
 venv
+env
 __pycache__

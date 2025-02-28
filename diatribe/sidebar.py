@@ -1,7 +1,6 @@
 import os
 import streamlit as st
-import diatribe.hume_audio as hume
-from elevenlabs import Voice, User, set_api_key
+from elevenlabs import Voice, set_api_key
 from dataclasses import dataclass
 from openai import OpenAI
 from streamlit_js_eval import streamlit_js_eval
@@ -17,7 +16,6 @@ class SidebarData:
   hume_key: str  
   audio_provider: AudioProvider
   audio_provider_options: Dict
-  voices: list[Voice]
   voice_names: list[str]
   enable_instructions: bool
   enable_audio_editing: bool
@@ -48,6 +46,7 @@ def create_sidebar() -> SidebarData:
   """Create the streamlit sidebar."""
   with st.sidebar:    
     with st.expander("Sound Engine", expanded=True):
+      audio_provider = None
       el_key = None
       hume_key = None
       sound_provider = st.selectbox("Provider", ["ElevenLabs", "Hume AI"])
@@ -64,6 +63,8 @@ def create_sidebar() -> SidebarData:
         if hume_key:
           st.session_state["hume_key_value"] = hume_key             
           audio_provider = HumeProvider()
+
+      audio_provider.define_usage()
     
     if audio_provider:        
       with st.expander("Sound Options"):
@@ -71,19 +72,7 @@ def create_sidebar() -> SidebarData:
                     
       with st.expander("Voice Explorer"):
         audio_provider.define_voice_explorer()                    
-                    
-      with st.expander("View Options"):          
-        show_instructions = st.toggle(
-          "Enable Instructions",
-          value=True,
-          help="Once you get familar with the app you can turn this off."
-        )
-        edit_audio = st.toggle(
-          "Enable Audio Editing", 
-          value=False,
-          help="Enable audio editing for each dialogue line. This is disabled by default to increase performance."
-        )
-      
+    
       with st.expander("OpenAI Options"):
         if os.getenv("OPENAI_API_KEY"):
           openai_key_value = os.getenv("OPENAI_API_KEY")
@@ -108,9 +97,18 @@ def create_sidebar() -> SidebarData:
           openai_temp = None
           openai_max_tokens = None          
       
-      with st.expander("Sound Engine Usage"):
-        audio_provider.define_usage()
-      
+      with st.expander("View Options"):          
+        show_instructions = st.toggle(
+          "Enable Instructions",
+          value=False,
+          help="Once you get familar with the app you can turn this off."
+        )
+        edit_audio = st.toggle(
+          "Enable Audio Editing", 
+          value=True,
+          help="Enable audio editing for each dialogue line. This is disabled by default to increase performance."
+        )
+
       clear_dialogue = st.button("Clear Dialogue", help=":warning: Clear everything and start over. :warning:", use_container_width=True)
       if clear_dialogue:
         streamlit_js_eval(js_expressions="parent.window.location.reload()")
@@ -121,7 +119,6 @@ def create_sidebar() -> SidebarData:
         hume_key=hume_key,
         audio_provider=audio_provider,
         audio_provider_options=audio_provider_options,
-        voices=hume.get_voices(),
         voice_names=audio_provider.get_voice_names(),
         enable_instructions=show_instructions,
         enable_audio_editing=edit_audio,        
@@ -137,7 +134,6 @@ def create_sidebar() -> SidebarData:
         hume_key="",
         audio_provider=None,
         audio_provider_options={},
-        voices=[],
         voice_names=[],
         enable_instructions=True,
         enable_audio_editing=False,

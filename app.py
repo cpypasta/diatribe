@@ -108,14 +108,20 @@ if __name__ == "__main__":
   if characters_available:
     characters: list[Character] = []
     for _, row in character_table.iterrows():
-      c = Character(
-        row["Name"], 
-        row["Voice"], 
-        sidebar.audio_provider.get_voice_id(row["Voice"]),
-        description=row["Description"],
-        group=int(row["Group"]) if row["Group"] is not None else 1
-      )
-      characters.append(c)
+      try:
+        voice_id = sidebar.audio_provider.get_voice_id(row["Voice"])
+        c = Character(
+          row["Name"], 
+          row["Voice"], 
+          voice_id,
+          description=row["Description"],
+          group=int(row["Group"]) if row["Group"] is not None else 1
+        )
+        characters.append(c)        
+      except Exception as ex:
+        st.toast(ex, icon="👎")
+        st.stop()
+
     character_names = [character.name for character in characters]
     
     st.header("Dialogue")
@@ -132,7 +138,7 @@ if __name__ == "__main__":
     elif "imported_dialogue" in st.session_state:
       dialogue_df = st.session_state["imported_dialogue"]
     else:
-      dialogue_df = pd.DataFrame([], columns=["Speaker", "Text"])
+      dialogue_df = pd.DataFrame([], columns=["Speaker", "Text", "Description"])
     
     dialogue_table = st.data_editor(
       dialogue_df,
@@ -151,7 +157,12 @@ if __name__ == "__main__":
           "Text",
           required=True,
           width="large"
-        )
+        ),
+        "Description": st.column_config.TextColumn(
+          "Description",
+          required=False,
+          width="large"
+        )        
       }
     )              
     
@@ -162,7 +173,7 @@ if __name__ == "__main__":
         try:
           character_index = character_names.index(row["Speaker"])
           character = characters[character_index]
-          dialogue.append(Dialogue(character, i+1, row["Text"]))
+          dialogue.append(Dialogue(character, i+1, row["Text"], row["Description"]))
         except:
           print(f"Error: {row['Speaker']} is not a valid character.")
           pass        
@@ -217,7 +228,8 @@ if __name__ == "__main__":
               line.text, 
               line.character.voice_id, 
               line.line, 
-              sidebar.audio_provider_options
+              sidebar.audio_provider_options,
+              guidance=line.get_guidance()
             )
 
             audio_files.append(audio_file)
@@ -238,7 +250,7 @@ if __name__ == "__main__":
           st.session_state["audio_files"] = audio_files
       
       if saves.prepare_project:
-        export_dialogue(character_table, dialogue_table, sidebar.voices)
+        export_dialogue(character_table, dialogue_table, sidebar.audio_provider)
         export_path = audio_tools.export_audio(get_lines(dialogue))
         project_path = f"./session/{st.session_state.session_id}/project"
         os.makedirs(project_path, exist_ok=True)
@@ -276,7 +288,8 @@ if __name__ == "__main__":
                 line.text, 
                 line.character.voice_id, 
                 line.line, 
-                sidebar.audio_provider_options
+                sidebar.audio_provider_options,
+                line.get_guidance()
               )
             st.rerun()
             

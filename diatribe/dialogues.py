@@ -29,22 +29,35 @@ class Character:
 
 
 class Dialogue:
-  def __init__(self, character: Character, line: int, text: str):
+  def __init__(self, character: Character, line: int, text: str, description: str = ""):
     self.character = character
     self.line = line
     self.text = text
+    self.description = description
+
+  def get_guidance(self) -> str:
+    character_guidance = self.character.description
+    line_guidance = self.description
+    guidance = f"{character_guidance}. {line_guidance}."
+    if ". ." == guidance:
+      guidance = None  
+
+    return guidance    
   
+
   def to_dict(self, without_line: bool = False) -> dict:
     if without_line:
       return {
         "Speaker": self.character.name,
-        "Text": self.text
+        "Text": self.text,
+        "Description": self.description
       }
     else:
       return {
         "Speaker": self.character.name,
         "Line": self.line,
-        "Text": self.text
+        "Text": self.text,
+        "Description": self.description
       }
     
   def __str__(self):
@@ -65,7 +78,7 @@ def generate_dialogue_details(
   dialogue: list[Dialogue] = []
   for i, d in dialogue_df.iterrows():
     character = next((c for c in characters if c.name == d["Speaker"]), None)
-    dialogue.append(Dialogue(character, i, d["Text"]).to_dict()) 
+    dialogue.append(Dialogue(character, i, d["Text"], description=d["Description"]).to_dict()) 
   dialogue_details = {
     "characters": [c.to_dict() for c in characters],
     "plot": plot,
@@ -100,14 +113,17 @@ def convert_dialogue_import_into_data(data: str) -> dict:
   for line in dialogue_input.split("\n"):
     if line.startswith("#"):
       continue
-    speaker, *text = line.split(":")
-    text = text[0]
+    speaker, text, *description = line.split(":")
+    if len(description) == 0:
+      description = ""
+    else:
+      description = description[0]
     character = next((c for c in characters if c["Name"] == speaker), None)
-    dialogues.append({ "Speaker": speaker, "Text": text.strip() })
+    dialogues.append({ "Speaker": speaker, "Text": text.strip(), "Description":  description.strip()})
   
   return {
     "characters": pd.DataFrame(characters, columns=["Name", "Voice", "Group", "Description"]), 
-    "dialogue": pd.DataFrame(dialogues, columns=["Speaker", "Text"]), 
+    "dialogue": pd.DataFrame(dialogues, columns=["Speaker", "Text", "Description"]), 
     "plot": plot
   }
 
@@ -124,7 +140,7 @@ def convert_dialogue_details_into_export(dialogue_details: dict) -> str:
     characters_output += f"{character['Name']}|{character['Voice']}|{character['Group']}: {character_description}\n"
   dialogue_output = "# DIALOGUE\n"
   for line in dialogue:
-    dialogue_output += f"{line['Speaker']}: {line['Text']}\n"
+    dialogue_output += f"{line['Speaker']}: {line['Text']}: {line['Description']}\n"
   return f"{characters_output}\n# PLOT\n{plot}{dialogue_output.strip()}"
 
 def export_dialogue(

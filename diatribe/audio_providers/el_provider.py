@@ -106,14 +106,18 @@ class ElevenLabsProvider(AudioProvider):
         return [f"{voice.name}{' (cloned)' if voice.category == 'cloned' else ''}" for voice in el_voices]
       
     def get_voice_id(self, name) -> str:
-      return get_voice_id(name, get_voices())
+      voices = get_voices()
+      voice_id = get_voice_id(name, voices)
+      if voice_id is None:
+        raise Exception(f"Voice ID not found for voice name: {name}")
+      return voice_id
       
     def define_options(self) -> Dict:
         models = get_models()
         model_ids = [m.model_id for m in models]
         model_names = [m.name for m in models]
         try:
-          turbo_model_index = model_names.index("Eleven Turbo v2")
+          turbo_model_index = model_names.index("Eleven Turbo v2.5")
         except:
           turbo_model_index = 0
         model_name = st.selectbox("Speech Model", model_names, index=turbo_model_index)
@@ -192,7 +196,8 @@ class ElevenLabsProvider(AudioProvider):
       text: str,
       voice_id: str,
       line: int,
-      options: Dict
+      options: Dict,
+      guidance: str = None
     ) -> str:
       """Generate audio from a dialogue and save it to a file."""
       audio = generate(text, voice_id, options)

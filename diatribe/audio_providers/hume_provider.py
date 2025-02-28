@@ -21,7 +21,6 @@ def generate(
     guidance: str = None,
     api_key: str = None
 ) -> ReturnGeneration:
-    api_key = "t3A3bzlqtfnasX7k0m0lSI5qPAEAMcGAT2mcOAnIdSKYJJdC"
     client = HumeClient(api_key=api_key)      
     speech = client.tts.synthesize_json(
         utterances=[
@@ -40,6 +39,9 @@ class HumeProvider(AudioProvider):
         return [voice.value.name for voice in voices]
     
     def get_voice_id(self, name) -> str:
+        voice = get_voice_from_name(name)
+        if voice is None:
+            raise Exception(f"Voice ID not found for voice name: {name}")
         return name
     
     def define_options(self) -> Dict:
@@ -58,10 +60,11 @@ class HumeProvider(AudioProvider):
         text: str,
         voice_id: str,
         line: int,
-        options: Dict
+        options: Dict,
+        guidance: str = None
     ) -> str:
         """Generate audio from a dialogue and save it to a file."""
-        speech = generate(text, get_voice_from_name(voice_id), api_key=options["api_key"])
+        speech = generate(text, get_voice_from_name(voice_id), api_key=options["api_key"], guidance=guidance)
         audio_data = base64.b64decode(speech.audio)
         audio_file = f"./session/{st.session_state.session_id}/audio/line{line}.wav"
         os.makedirs(os.path.dirname(audio_file), exist_ok=True)

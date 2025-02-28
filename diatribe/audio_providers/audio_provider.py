@@ -28,6 +28,7 @@ class AudioProvider(ABC):
         text: str,
         voice_id: str,
         line: int,
-        options: Dict
+        options: Dict,
+        guidance: str = None
     ) -> str:
         pass            
