@@ -2,7 +2,7 @@ import os, shutil, glob
 import streamlit as st
 from diatribe.dialogues import convert_dialogue_import_into_data
 from dataclasses import dataclass
-from diatribe.el_audio import import_audio
+from diatribe.audio_tools import import_audio
 from diatribe.utils import remove_state
 from diatribe.utils import log
 

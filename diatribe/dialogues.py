@@ -1,9 +1,8 @@
 import os, re
 import pandas as pd
 import streamlit as st
-from elevenlabs import Voice
-from diatribe.el_audio import get_voice_id
 from diatribe.utils import log
+from diatribe.audio_providers.audio_provider import AudioProvider
 
 class Character:
   def __init__(self, name: str, voice: str, voice_id: str, description: str = "", group: int = 1) -> None:
@@ -55,13 +54,14 @@ class Dialogue:
 def generate_dialogue_details(
   characters_df: pd.DataFrame, 
   dialogue_df: pd.DataFrame, 
-  voices: list[Voice],
+  audio_provider: AudioProvider,
   plot: str = None
 ) -> dict:
   """Generate dialogue details in a common format suitiable for JSON."""
   characters: list[Character] = []
   for i, c in characters_df.iterrows():
-    characters.append(Character(c["Name"], c["Voice"], get_voice_id(c["Voice"], voices), description=c["Description"], group=c["Group"]))
+    voice_id = audio_provider.get_voice_id(c["Voice"])
+    characters.append(Character(c["Name"], c["Voice"], voice_id, description=c["Description"], group=c["Group"]))
   dialogue: list[Dialogue] = []
   for i, d in dialogue_df.iterrows():
     character = next((c for c in characters if c.name == d["Speaker"]), None)
@@ -130,11 +130,11 @@ def convert_dialogue_details_into_export(dialogue_details: dict) -> str:
 def export_dialogue(
   characters: pd.DataFrame, 
   dialogue: pd.DataFrame, 
-  voices: list[Voice]
+  audio_provider: AudioProvider
 ) -> str:
   save_filename = f"./session/{st.session_state.session_id}/export/dialogue.txt"
   plot = st.session_state["plot"] if "plot" in st.session_state else None
-  dialogue_details = generate_dialogue_details(characters, dialogue, voices, plot=plot)
+  dialogue_details = generate_dialogue_details(characters, dialogue, audio_provider, plot=plot)
   dialogue_export = convert_dialogue_details_into_export(dialogue_details)
   os.makedirs(os.path.dirname(save_filename), exist_ok=True)     
   with open(save_filename, "w") as f:

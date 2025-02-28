@@ -2,11 +2,11 @@ import os, uuid, shutil
 import matplotlib.pyplot as plt
 import streamlit as st
 import pandas as pd
-import diatribe.el_audio as el_audio
+import diatribe.audio_tools as audio_tools
 import diatribe.saved_dialogues as saved_dialogues
 from dotenv import load_dotenv
 from streamlit_extras.stylable_container import stylable_container
-from diatribe.dialogues import Character, Dialogue, get_voice_id, export_dialogue, get_lines
+from diatribe.dialogues import Character, Dialogue, export_dialogue, get_lines
 from diatribe.sidebar import create_sidebar
 from diatribe.saved_dialogues import create_saved_dialogues
 from diatribe.generate import create_dialogue_generation, create_continue_dialogue
@@ -38,14 +38,14 @@ if __name__ == "__main__":
   
   sidebar = create_sidebar()
     
-  if sidebar.el_key:
+  if sidebar.ready:
     saves = create_saved_dialogues()    
     
     st.header("Characters")
     if sidebar.enable_instructions:
       st.markdown("This is where you setup and define what characters are in your dialogue along with what voice the character should use. You can use the `Voice Explorer` in the sidebar if you want to hear what a voice sounds like.")
       with st.expander("**WARNING**: changing characters can clear the dialogue"):
-        st.info("Adding characters, removing characters, and modifying character names will clear or reset the dialogue. That being said, you can freely change the voices, groups, and description without affecting the dialogue.")      
+        st.info("Adding characters, removing characters, and modifying character names will clear or reset the dialogue. That being said, you can freely change the voices, groups, and description without affecting the dialogue. Also, changing the sound engine will cause a reset since the voices will be different.")      
     
     with st.expander("Import Characters & Dialogue"):
       uploaded_dialogue = None
@@ -111,7 +111,7 @@ if __name__ == "__main__":
       c = Character(
         row["Name"], 
         row["Voice"], 
-        get_voice_id(row["Voice"], sidebar.voices),
+        sidebar.audio_provider.get_voice_id(row["Voice"]),
         description=row["Description"],
         group=int(row["Group"]) if row["Group"] is not None else 1
       )
@@ -171,7 +171,7 @@ if __name__ == "__main__":
       with st.expander("Export Characters & Dialogue"):
         prepare_download_dialogue = st.button("Prepare Download", help="This will prepare the dialogue for download.", use_container_width=True)
         if prepare_download_dialogue:
-          export_dialogue_path = export_dialogue(character_table, dialogue_table, sidebar.voices)
+          export_dialogue_path = export_dialogue(character_table, dialogue_table, sidebar.audio_provider)
           with open(export_dialogue_path, "r") as f:
             st.download_button(
               "Download",
@@ -192,7 +192,7 @@ if __name__ == "__main__":
       
       # generate audio dialogue files
       st.markdown("---")
-      existing_audio_files = el_audio.get_generated_audio()
+      existing_audio_files = audio_tools.get_generated_audio()
     
       with stylable_container(
         key="generate_dialogue_button_with_existing",
@@ -202,7 +202,7 @@ if __name__ == "__main__":
 
       if generate_btn:
         st.session_state["final_audio"] = False
-        el_audio.clear_audio_files()
+        audio_tools.clear_audio_files()
         audio_files: list[str] = []
         progress_text = "Generating audio..."
         if "audio_process_error" in st.session_state:
@@ -213,7 +213,13 @@ if __name__ == "__main__":
             st.toast(f"Error: voice ID not found for `{line.character.voice}`.", icon="👎")
             break
           try:
-            audio_file = el_audio.generate_and_save(line.text, line.character.voice_id, line.line, sidebar) 
+            audio_file = sidebar.audio_provider.generate_and_save(
+              line.text, 
+              line.character.voice_id, 
+              line.line, 
+              sidebar.audio_provider_options
+            )
+
             audio_files.append(audio_file)
           except Exception as e:
             print(e)
@@ -233,7 +239,7 @@ if __name__ == "__main__":
       
       if saves.prepare_project:
         export_dialogue(character_table, dialogue_table, sidebar.voices)
-        export_path = el_audio.export_audio(get_lines(dialogue))
+        export_path = audio_tools.export_audio(get_lines(dialogue))
         project_path = f"./session/{st.session_state.session_id}/project"
         os.makedirs(project_path, exist_ok=True)
         shutil.make_archive(f"{project_path}/project", "zip", export_path)
@@ -266,7 +272,12 @@ if __name__ == "__main__":
             redo_btn = st.button("Redo", key=redo_key)
           if redo_btn:
             with st.spinner("Generating audio..."):
-              el_audio.generate_and_save(line.text, line.character.voice_id, line.line, sidebar)
+              sidebar.audio_provider.generate_and_save(
+                line.text, 
+                line.character.voice_id, 
+                line.line, 
+                sidebar.audio_provider_options
+              )
             st.rerun()
             
           # dialogue audio editing
@@ -283,7 +294,7 @@ if __name__ == "__main__":
           join_dialogue = st.button("Join Dialogue", use_container_width=True, type="primary")
         line_indices = [d.line for d in dialogue]
         if join_dialogue:          
-          el_audio.join_audio(
+          audio_tools.join_audio(
             line_indices
           )
           st.session_state["final_audio"] = True
@@ -299,7 +310,7 @@ if __name__ == "__main__":
         
         dialogue_path = f"./session/{st.session_state.session_id}/final/audio/dialogue.mp3"
         st.audio(dialogue_path)
-        _, fig = el_audio.generate_waveform_from_file(dialogue_path)       
+        _, fig = audio_tools.generate_waveform_from_file(dialogue_path)       
         st.pyplot(fig)
           
         with open(dialogue_path, "rb") as mp3_audio:

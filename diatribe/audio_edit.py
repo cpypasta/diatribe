@@ -1,5 +1,5 @@
 import streamlit as st
-import diatribe.el_audio as el_audio
+import diatribe.audio_tools as audio_tools
 from diatribe.dialogues import Dialogue, Character
 from diatribe.sidebar import SidebarData
 from diatribe.utils import log
@@ -247,7 +247,7 @@ def create_reverb(key: str) -> ReverbEdit:
         reverb_dry_level
     )
 
-def create_soundboard(key: str, edits: list[str]) -> el_audio.Soundboard:
+def create_soundboard(key: str, edits: list[str]) -> audio_tools.Soundboard:
     edit_tabs = st.tabs(edits)
     created_edits = []
     for i, tab in enumerate(edit_tabs):
@@ -271,7 +271,7 @@ def create_soundboard(key: str, edits: list[str]) -> el_audio.Soundboard:
                 compressor = create_compressor(key)
                 created_edits.append(compressor) 
                 
-    return el_audio.Soundboard(created_edits)
+    return audio_tools.Soundboard(created_edits)
 
 
 def find_lines(group: int, characters: list[Character], dialogue: list[Dialogue]) -> list[int]:
@@ -313,7 +313,7 @@ def create_edit_dialogue_line(line: Dialogue, audio_file: str) -> None:
     should_show_audio_edit = st.session_state[edit_audio_line_key]
     if should_show_audio_edit:    
         with st.container(border=True):
-            speech_duration = el_audio.get_audio_duration(audio_file)  
+            speech_duration = audio_tools.get_audio_duration(audio_file)  
             speech_duration_int = int(speech_duration * 1000)        
             basic_tab, soundboard_tab, special_tab,  = st.tabs(["Basic", "Soundboard", "Special Effect"])
             
@@ -403,14 +403,14 @@ def create_edit_dialogue_line(line: Dialogue, audio_file: str) -> None:
                         if uploaded_special_effect and submit_uploaded_special_effect:
                             if uploaded_special_effect:
                                 audio_file = uploaded_special_effect.getvalue()
-                                el_audio.save_sound_effect(audio_file, uploaded_special_effect.name)
+                                audio_tools.save_sound_effect(audio_file, uploaded_special_effect.name)
                                 st.toast("Special effect has been uploaded. Please click refresh to see it.", icon="👍")                      
                     
                 col1, col2 = st.columns([8, 1])
                 with col1:
                     effect_name = st.selectbox(
                         "Effects", 
-                        el_audio.get_effect_names(), 
+                        audio_tools.get_effect_names(), 
                         index=None, 
                         label_visibility="collapsed", 
                         placeholder="Select an effect",
@@ -420,7 +420,7 @@ def create_edit_dialogue_line(line: Dialogue, audio_file: str) -> None:
                     st.button("Refresh", use_container_width=True, key=f"refresh_effect_{line.line}")
                     
                 if effect_name:
-                    effect_path = el_audio.get_effect_path(effect_name)
+                    effect_path = audio_tools.get_effect_path(effect_name)
                     st.audio(effect_path)                   
                     
                     effect_volume_tab, effect_timing_tab = st.tabs(["Volume", "Timing"])
@@ -477,7 +477,7 @@ def create_edit_dialogue_line(line: Dialogue, audio_file: str) -> None:
                     use_container_width=True
                 )
                 if preview_line:
-                    preview_audio = el_audio.preview_audio(
+                    preview_audio = audio_tools.preview_audio(
                         audio_file, 
                         soundboard
                     )                          
@@ -489,12 +489,12 @@ def create_edit_dialogue_line(line: Dialogue, audio_file: str) -> None:
                         with org_audio_waveform:
                             st.markdown("<p style='font-size:14px'>Original</p>", unsafe_allow_html=True)
                             st.audio(audio_file)
-                            y_max, plot = el_audio.generate_waveform_from_file(audio_file)
+                            y_max, plot = audio_tools.generate_waveform_from_file(audio_file)
                             st.pyplot(plot)                  
                         with new_audio_waveform:
                             st.markdown("<p style='font-size:14px'>Updated</p>", unsafe_allow_html=True)
                             st.audio(preview_audio)
-                            _, plot = el_audio.generate_waveform_from_bytes(preview_audio, y_max)
+                            _, plot = audio_tools.generate_waveform_from_bytes(preview_audio, y_max)
                             st.pyplot(plot) 
                     else:
                         st.toast("There are no audio edits selected.", icon="ℹ️")
@@ -505,7 +505,7 @@ def create_edit_dialogue_line(line: Dialogue, audio_file: str) -> None:
                     use_container_width=True
                 )
                 if apply_edits:
-                    new_line_audio = el_audio.edit_audio(
+                    new_line_audio = audio_tools.edit_audio(
                         audio_file,
                         soundboard                
                     )
@@ -579,14 +579,14 @@ def create_edit_diatribe(sidebar: SidebarData, characters: list[Character], dial
                             if uploaded_soundtrack and submit_uploaded_soundtrack:
                                 if uploaded_soundtrack:
                                     audio_file = uploaded_soundtrack.getvalue()
-                                    el_audio.save_background_audio(audio_file, uploaded_soundtrack.name)
+                                    audio_tools.save_background_audio(audio_file, uploaded_soundtrack.name)
                                     st.toast("Soundtrack has been uploaded. Please click refresh to see it.", icon="👍")
                     
                     col1, col2 = st.columns([8, 1])
                     with col1:
                         background_audio = st.selectbox(
                             "Background Audio", 
-                            el_audio.get_background_names(), 
+                            audio_tools.get_background_names(), 
                             index=None, 
                             placeholder="select a soundtrack",
                             label_visibility="collapsed"
@@ -595,7 +595,7 @@ def create_edit_diatribe(sidebar: SidebarData, characters: list[Character], dial
                         st.button("Refresh", use_container_width=True, key="refresh_background")
                         
                     if background_audio:
-                        st.audio(el_audio.get_background_path(background_audio))
+                        st.audio(audio_tools.get_background_path(background_audio))
                         background_fade, background_volume = st.columns([1, 3])
                         with background_fade:
                             fade_in = st.toggle("Fade In", value=False)
@@ -622,7 +622,7 @@ def create_edit_diatribe(sidebar: SidebarData, characters: list[Character], dial
             preview_background_bnt = st.button("Preview", use_container_width=True)
             if preview_background_bnt:
                 with st.spinner("Mastering audio..."):
-                    original_audio, updated_audio = el_audio.preview_mastered_audio(
+                    original_audio, updated_audio = audio_tools.preview_mastered_audio(
                         lines_affected, 
                         line_indices, 
                         soundboard, 
@@ -635,18 +635,18 @@ def create_edit_diatribe(sidebar: SidebarData, characters: list[Character], dial
                 with org_audio_waveform:
                     st.markdown("<p style='font-size:14px'>Original</p>", unsafe_allow_html=True)
                     st.audio(original_audio)
-                    y_max, plot = el_audio.generate_waveform_from_file(original_audio)
+                    y_max, plot = audio_tools.generate_waveform_from_file(original_audio)
                     st.pyplot(plot)                  
                 with new_audio_waveform:
                     st.markdown("<p style='font-size:14px'>Updated</p>", unsafe_allow_html=True)
                     st.audio(updated_audio)
-                    _, plot = el_audio.generate_waveform_from_file(updated_audio, y_max)
+                    _, plot = audio_tools.generate_waveform_from_file(updated_audio, y_max)
                     st.pyplot(plot)              
                     
             add_background_btn = st.button("Apply", use_container_width=True)
             if add_background_btn:
                 with st.spinner("Mastering audio..."):
-                    el_audio.apply_mastered_audio(
+                    audio_tools.apply_mastered_audio(
                         lines_affected, 
                         line_indices, 
                         soundboard, 

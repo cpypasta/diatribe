@@ -40,7 +40,7 @@ st.markdown("""
     ### Characters
     The `Characters` section is where you define the speakers of your dialogue. It's also where you decide what voice each character should have. The voices available to you are whatever are provided by ElevenLabs and any cloned voices you may have created. The required fields are `Name` and `Voice`. There are a few optional fields: `Group` and `Description`. These optional fields help with some more advanced features such as dialogue generation using OpenAI and editing the final `Audio Diatribe`.
 """)
-st.warning(""":warning: Adding characters, removing characters, and modifying character names will clear or reset the dialogue. That being said, you can freely change the voices, groups, and description without affecting the dialogue.
+st.warning(""":warning: Adding characters, removing characters, and modifying character names will clear or reset the dialogue. That being said, you can freely change the voices, groups, and description without affecting the dialogue. Also, changing the sound engine will cause a reset since the voices will be different.
 """)
 st.image("./images/characters.png", use_column_width=True, caption="Example Characters Section")
 

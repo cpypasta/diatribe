@@ -1,76 +1,30 @@
-import os, diatribe.el_audio as el_audio, diatribe.utils as utils, datetime
+import os
 import streamlit as st
+import diatribe.hume_audio as hume
 from elevenlabs import Voice, User, set_api_key
 from dataclasses import dataclass
 from openai import OpenAI
 from streamlit_js_eval import streamlit_js_eval
+from diatribe.audio_providers.hume_provider import HumeProvider
+from diatribe.audio_providers.el_provider import ElevenLabsProvider
+from diatribe.audio_providers.audio_provider import AudioProvider
+from typing import Dict
 
 @dataclass
 class SidebarData:
+  ready: bool
   el_key: str
-  model_id: str
+  hume_key: str  
+  audio_provider: AudioProvider
+  audio_provider_options: Dict
   voices: list[Voice]
   voice_names: list[str]
   enable_instructions: bool
   enable_audio_editing: bool
-  stability: float
-  simarlity_boost: float
-  style: float
   openai_api_key: str
   openai_model: str
   openai_temp: float
   openai_max_tokens: int
-
-@st.cache_data(ttl=900)
-def get_usage_percent() -> dict:
-  """Get the character usage percent from the Eleven Labs API."""
-  user_info = User.from_api()
-  percent = user_info.subscription.character_count / user_info.subscription.character_limit * 100
-  resets = user_info.subscription.next_character_count_reset_unix
-  resets = datetime.datetime.fromtimestamp(resets).strftime("%m/%d")
-  return {
-    "usage": percent,
-    "reset": resets,
-    "count": user_info.subscription.character_count,
-    "limit": user_info.subscription.character_limit
-  }
-
-def get_voice_by_name(name: str, voices: list[Voice]) -> Voice:
-  """Get a voice by the voice name."""
-  name = utils.extract_name(name)
-  return next((v for v in voices if v.name == name), None)
-
-def get_cloned_voices(voices: list[Voice]) -> list[Voice]:
-  """Get a list of cloned voices."""
-  return [f"{v.name} (cloned)" for v in voices if v.category == "cloned"]
-
-def voice_names_with_filter(
-  voices: list[Voice], 
-  gender: str, 
-  age: str, 
-  accent: str, 
-  cloned: bool
-) -> list[str]:
-  """Get a list of voice names filtered by gender, age, accent, and cloned."""
-  voice_names = []
-  for v in voices:
-    v_labels = v.labels
-    v_gender = v_labels["gender"] if "gender" in v_labels else None
-    v_age = v_labels["age"] if "age" in v_labels else None
-    v_acccent = v_labels["accent"] if "accent" in v_labels else None
-    match = True
-    if gender and v_gender != gender:
-      match = False
-    if age and v_age != age:
-      match = False
-    if accent and v_acccent != accent:
-      match = False
-    if cloned:
-      if v.category != "cloned":
-        match = False
-    if match:
-      voice_names.append(f"{v.name} ({v.category})" if v.category == "cloned" else v.name)
-  return voice_names
 
 @st.cache_data
 def get_models(openai_api_key: str) -> list[str]:
@@ -81,34 +35,44 @@ def get_models(openai_api_key: str) -> list[str]:
   return sorted(model_ids)
 
 
+def get_env_key(os_name: str, session_name: str) -> str:
+    if os.getenv(os_name):
+      value = os.getenv(os_name)
+    elif session_name in st.session_state:
+      value = st.session_state[session_name]
+    else:
+      value = ""  
+    return value
+
 def create_sidebar() -> SidebarData:
   """Create the streamlit sidebar."""
   with st.sidebar:    
-    if os.getenv("ELEVENLABS_API_KEY"):
-      el_key_value = os.getenv("ELEVENLABS_API_KEY")
-    elif "el_key_value" in st.session_state:
-      el_key_value = st.session_state["el_key_value"]
-    else:
-      el_key_value = ""
-    el_key = st.text_input("ElevenLabs API Key", el_key_value, type="password", key="el_key")        
+    with st.expander("Sound Engine", expanded=True):
+      el_key = None
+      hume_key = None
+      sound_provider = st.selectbox("Provider", ["ElevenLabs", "Hume AI"])
+      if sound_provider == "ElevenLabs":
+        el_key_value = get_env_key("ELEVENLABS_API_KEY", "el_key_value")
+        el_key = st.text_input("ElevenLabs API Key", el_key_value, type="password", key="el_key")  
+        if el_key:
+          st.session_state["el_key_value"] = el_key  
+          set_api_key(el_key)    
+          audio_provider = ElevenLabsProvider()
+      elif sound_provider == "Hume AI":    
+        hume_key_value = get_env_key("HUME_API_KEY", "hume_key_value")
+        hume_key = st.text_input("Hume API Key", hume_key_value, type="password", key="hume_key")        
+        if hume_key:
+          st.session_state["hume_key_value"] = hume_key             
+          audio_provider = HumeProvider()
     
-    if el_key:
-      st.session_state["el_key_value"] = el_key
-      set_api_key(el_key) 
-          
-      with st.expander("Dialogue Options"):  
-        models = el_audio.get_models()
-        model_ids = [m.model_id for m in models]
-        model_names = [m.name for m in models]
-        try:
-          turbo_model_index = model_names.index("Eleven Turbo v2")
-        except:
-          turbo_model_index = 0
-        model_name = st.selectbox("Speech Model", model_names, index=turbo_model_index)
-        if model_name:
-          model_index = model_names.index(model_name)
-          model_id = model_ids[model_index]   
-        
+    if audio_provider:        
+      with st.expander("Sound Options"):
+        audio_provider_options = audio_provider.define_options()                                  
+                    
+      with st.expander("Voice Explorer"):
+        audio_provider.define_voice_explorer()                    
+                    
+      with st.expander("View Options"):          
         show_instructions = st.toggle(
           "Enable Instructions",
           value=True,
@@ -119,28 +83,6 @@ def create_sidebar() -> SidebarData:
           value=False,
           help="Enable audio editing for each dialogue line. This is disabled by default to increase performance."
         )
-                           
-        stability = st.slider(
-          "Stability", 
-          0.0, 
-          1.0, 
-          value=0.35, 
-          help="Increasing stability will make the voice more consistent between re-generations, but it can also make it sounds a bit monotone. On longer text fragments we recommend lowering this value."
-        )
-        simarlity_boost = st.slider(
-          "Clarity + Simalarity Enhancement",
-          0.0,
-          1.0,
-          value=0.80,
-          help="High enhancement boosts overall voice clarity and target speaker similarity. Very high values can cause artifacts, so adjusting this setting to find the optimal value is encouraged."
-        )
-        style = st.slider(
-          "Style Exaggeration",
-          0.0,
-          1.0,
-          value=0.0,
-          help="High values are recommended if the style of the speech should be exaggerated compared to the uploaded audio. Higher values can lead to more instability in the generated speech. Setting this to 0.0 will greatly increase generation speed and is the default setting."
-        )   
       
       with st.expander("OpenAI Options"):
         if os.getenv("OPENAI_API_KEY"):
@@ -164,61 +106,25 @@ def create_sidebar() -> SidebarData:
         else:
           openai_model = None
           openai_temp = None
-          openai_max_tokens = None
+          openai_max_tokens = None          
       
-      
-      with st.expander("Voice Explorer"):
-        el_voices = el_audio.get_voices()
-        el_voice_names = [f"{voice.name}{' (cloned)' if voice.category == 'cloned' else ''}" for voice in el_voices]
-        el_voice_accents = set([voice.labels["accent"] for voice in el_voices if "accent" in voice.labels])
-        el_voice_ages = set([voice.labels["age"] for voice in el_voices if "age" in voice.labels])
-        el_voice_genders = set([voice.labels["gender"] for voice in el_voices if "gender" in voice.labels])
-        el_voice_accents = sorted(el_voice_accents, key=lambda x: x.lower())
-        
-        el_voice_cloned = st.toggle("Cloned Voices Only", value=False)
-        el_voice_gender = st.selectbox("Gender Filter", el_voice_genders, index=None)
-        el_voice_age = st.selectbox("Age Filter", el_voice_ages, index=None)
-        el_voice_accent = st.selectbox("Accent Filter", el_voice_accents, index=None)
-        
-        speaker_voice_names = voice_names_with_filter(
-          el_voices, 
-          el_voice_gender, 
-          el_voice_age, 
-          el_voice_accent,
-          el_voice_cloned
-        )
-        el_voice = st.selectbox("Speaker", speaker_voice_names)
-        if el_voice:
-          el_voice_details = get_voice_by_name(el_voice, el_voices)
-          el_voice_id = el_voice_details.voice_id
-          
-          # voice sample        
-          if el_voice_details.preview_url:
-            st.audio(el_voice_details.preview_url, format="audio/mp3")
-        
-          st.markdown(f"_Voice ID: {el_voice_id}_") 
-      
-      with st.expander("Usage"):
-        usage = get_usage_percent()
-        st.markdown(f"**Character Percent:** {usage['usage']:.1f}%")
-        st.markdown(f"**Character Count:** {usage['count']:,}")
-        st.markdown(f"**Character Limit:** {usage['limit']:,}")
-        st.markdown(f"**Reset:** {usage['reset']}")
+      with st.expander("Sound Engine Usage"):
+        audio_provider.define_usage()
       
       clear_dialogue = st.button("Clear Dialogue", help=":warning: Clear everything and start over. :warning:", use_container_width=True)
       if clear_dialogue:
         streamlit_js_eval(js_expressions="parent.window.location.reload()")
         
       return SidebarData( 
+        ready=el_key or hume_key,
         el_key=el_key,
-        model_id=model_id,
-        voices=el_voices,
-        voice_names=el_voice_names,
+        hume_key=hume_key,
+        audio_provider=audio_provider,
+        audio_provider_options=audio_provider_options,
+        voices=hume.get_voices(),
+        voice_names=audio_provider.get_voice_names(),
         enable_instructions=show_instructions,
-        enable_audio_editing=edit_audio,
-        stability=stability,
-        simarlity_boost=simarlity_boost,
-        style=style,
+        enable_audio_editing=edit_audio,        
         openai_api_key=openai_api_key,
         openai_model=openai_model,
         openai_temp=openai_temp,
@@ -226,15 +132,15 @@ def create_sidebar() -> SidebarData:
       )
     else:
       return SidebarData(
+        ready=False,
         el_key="",
-        model_id="",
+        hume_key="",
+        audio_provider=None,
+        audio_provider_options={},
         voices=[],
         voice_names=[],
         enable_instructions=True,
         enable_audio_editing=False,
-        stability=0.35,
-        simarlity_boost=0.80,
-        style=0.0,
         openai_api_key="",
         openai_model="",
         openai_temp=1.5,
