@@ -524,6 +524,8 @@ def create_edit_diatribe(sidebar: SidebarData, characters: list[Character], dial
         st.session_state["background_edit"] = not st.session_state["background_edit"]
     
     should_show_background_edit = st.session_state["background_edit"]
+    whole_dialogue = st.session_state["whole_dialogue"] if "whole_dialogue" in st.session_state else False
+
     if should_show_background_edit:
         with st.container(border=True):
             background_tab, timing_tab = st.tabs(["Mastering", "Timing"])
@@ -531,7 +533,10 @@ def create_edit_diatribe(sidebar: SidebarData, characters: list[Character], dial
                 st.markdown("### ⏱️ Timing")
                 if sidebar.enable_instructions:
                     st.markdown("Timing allows you to adjust the standard gap (or silence) between lines.")
-                
+                                
+                if whole_dialogue:
+                    st.warning("The sound engine doesn't support adjusting timing.")
+
                 with st.container(border=True):
                     join_gap = st.slider(
                         "Standard Gap (ms)",
@@ -539,7 +544,8 @@ def create_edit_diatribe(sidebar: SidebarData, characters: list[Character], dial
                         1000,
                         step=10,
                         value=200,
-                        help="The gap between spoken lines in milliseconds."
+                        help="The gap between spoken lines in milliseconds.",
+                        disabled=whole_dialogue
                     )
             
             with background_tab:
@@ -554,16 +560,21 @@ def create_edit_diatribe(sidebar: SidebarData, characters: list[Character], dial
                     help="Adjusts the final dialogue to meet audiobook standards. The standard states that the audio should have a ceiling of -3dB and a range of -18dB to -23dB."
                 )                 
                 
-                group_options = create_group_options(characters)
-                background_group = st.selectbox(
-                    "Character Group _(optional)_)",
-                    group_options,
-                    index=None,
-                    placeholder="select a character group (defaults to all)",
-                    help="Allows you to select a character group to limit mastering.",
-                    label_visibility="collapsed"
-                )
-                lines_affected = find_lines(background_group, characters, dialogue)                
+                if whole_dialogue:
+                    lines_affected = None
+                else:
+                    group_options = create_group_options(characters)
+                    background_group = st.selectbox(
+                        "Character Group _(optional)_)",
+                        group_options,
+                        index=None,
+                        placeholder="select a character group (defaults to all)",
+                        help="Allows you to select a character group to limit mastering.",
+                        label_visibility="collapsed"
+                    )
+                    lines_affected = find_lines(background_group, characters, dialogue)
+                    if background_group is None:
+                        whole_dialogue = True                
                 
                 soundtrack_tab, soundboard_tab = st.tabs(["Soundtrack", "Soundboard"])
                 with soundtrack_tab:
@@ -626,7 +637,8 @@ def create_edit_diatribe(sidebar: SidebarData, characters: list[Character], dial
                         lines_affected, 
                         line_indices, 
                         soundboard, 
-                        join_gap
+                        join_gap,
+                        whole=whole_dialogue
                     )
                 adjustments = soundboard.adjustments()
                 if len(adjustments) > 0:
@@ -650,7 +662,8 @@ def create_edit_diatribe(sidebar: SidebarData, characters: list[Character], dial
                         lines_affected, 
                         line_indices, 
                         soundboard, 
-                        join_gap
+                        join_gap,
+                        whole=whole_dialogue
                     )
                     st.toast("Mastering has been applied.", icon="👍")
                         

@@ -1,9 +1,12 @@
 elevenlabs==0.2.27
 ffmpeg-python==0.2.0
 hume==0.7.8
-openai==1.6.1
+openai==1.65.2
 pedalboard==0.8.7
 pip==24.3.1
 pydub==0.25.1
 python-dotenv==1.0.0
 streamlit-js-eval==0.1.5
+soundfile==0.13.1
+kokoro==0.8.4
+huggingface-hub==0.29.1

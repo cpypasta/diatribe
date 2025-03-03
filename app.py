@@ -12,6 +12,7 @@ from diatribe.saved_dialogues import create_saved_dialogues
 from diatribe.generate import create_dialogue_generation, create_continue_dialogue
 from diatribe.utils import log
 from diatribe.audio_edit import create_edit_dialogue_line, create_edit_diatribe
+from diatribe.audio_providers.dialogue_provider import DialogueProvider
 
 load_dotenv()
 plt.style.use('dark_background')
@@ -39,6 +40,7 @@ if __name__ == "__main__":
   sidebar = create_sidebar()
     
   if sidebar.ready:
+    st.text("Session: " + st.session_state.session_id)
     saves = create_saved_dialogues()    
     
     st.header("Characters")
@@ -218,27 +220,39 @@ if __name__ == "__main__":
         progress_text = "Generating audio..."
         if "audio_process_error" in st.session_state:
           del st.session_state["audio_process_error"]
-        generate_audio_bar = st.progress(0, text=progress_text)
-        for i, line in enumerate(dialogue):
-          if line.character.voice_id is None:
-            st.toast(f"Error: voice ID not found for `{line.character.voice}`.", icon="👎")
-            break
-          try:
-            audio_file = sidebar.audio_provider.generate_and_save(
-              line.text, 
-              line.character.voice_id, 
-              line.line, 
-              sidebar.audio_provider_options,
-              guidance=line.get_guidance()
-            )
 
-            audio_files.append(audio_file)
-          except Exception as e:
-            print(e)
-            st.session_state["audio_process_error"] = f"{line.character.name} with the voice {line.character.voice} (voice_id: {line.character.voice_id})"
-            break
-          generate_audio_bar.progress(round((i+1) / len(dialogue), 2), text=progress_text)          
-        generate_audio_bar.empty()
+
+        whole_dialogue = isinstance(sidebar.audio_provider, DialogueProvider)
+        if whole_dialogue:
+          st.session_state["whole_dialogue"] = True
+          with st.spinner("Generating dialogue..."):
+            provider: DialogueProvider = sidebar.audio_provider
+            provider.generate_dialogue(dialogue, sidebar.audio_provider_options)
+          st.session_state["final_audio"] = True
+        else:
+          if "whole_dialogue" in st.session_state:
+            del st.session_state["whole_dialogue"]
+          generate_audio_bar = st.progress(0, text=progress_text)
+          for i, line in enumerate(dialogue):
+            if line.character.voice_id is None:
+              st.toast(f"Error: voice ID not found for `{line.character.voice}`.", icon="👎")
+              break
+            try:
+              audio_file = sidebar.audio_provider.generate_and_save(
+                line.text, 
+                line.character.voice_id, 
+                line.line, 
+                sidebar.audio_provider_options,
+                guidance=line.get_guidance()
+              )
+
+              audio_files.append(audio_file)
+            except Exception as e:
+              print(e)
+              st.session_state["audio_process_error"] = f"{line.character.name} with the voice {line.character.voice} (voice_id: {line.character.voice_id})"
+              break
+            generate_audio_bar.progress(round((i+1) / len(dialogue), 2), text=progress_text)          
+          generate_audio_bar.empty()
         
         if "audio_process_error" in st.session_state:
           st.error(f"""An error occured while generating the audio. Please check your API key.
@@ -246,8 +260,11 @@ if __name__ == "__main__":
           """)
           if "audio_files" in st.session_state:
             del st.session_state["audio_files"]
-        else:
+        elif not whole_dialogue:
           st.session_state["audio_files"] = audio_files
+        else:
+          if "audio_files" in st.session_state:
+            del st.session_state["audio_files"]          
       
       if saves.prepare_project:
         export_dialogue(character_table, dialogue_table, sidebar.audio_provider)

@@ -1,10 +1,11 @@
 import elevenlabs as el, streamlit as st, re, os, traceback, datetime
 from typing import List, Dict
 from diatribe.audio_providers.audio_provider import AudioProvider
+from diatribe.utils import get_env_key
 from elevenlabs import Voice, Models, Model, VoiceSettings, User
 
 @st.cache_data
-def get_voices() -> list[Voice]:
+def get_voices() -> List[Voice]:
   voices: list[Voice] = list(el.voices())
   voices.sort(key=lambda x: x.name)
   return voices
@@ -112,6 +113,13 @@ class ElevenLabsProvider(AudioProvider):
         raise Exception(f"Voice ID not found for voice name: {name}")
       return voice_id
       
+    def define_creds(self) -> None:
+      el_key_value = get_env_key("ELEVENLABS_API_KEY", "el_key_value")
+      el_key = st.text_input("ElevenLabs API Key", el_key_value, type="password", key="el_key")  
+      if el_key:
+        el.set_api_key(el_key)  
+        st.session_state["el_key_value"] = el_key        
+
     def define_options(self) -> Dict:
         models = get_models()
         model_ids = [m.model_id for m in models]

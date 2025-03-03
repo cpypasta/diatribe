@@ -1,16 +1,14 @@
-import os, glob, shutil, io, traceback
+import os, glob, shutil, io
 import streamlit as st
 import numpy as np
 import matplotlib.pyplot as plt
-import diatribe.utils as utils
-from elevenlabs import Voice, VoiceSettings, Model, Models, voices as el_voices, generate as el_generate
 from pydub import AudioSegment as seg
 from pedalboard import Pedalboard, Plugin
 from pedalboard.io import AudioFile
 from math import ceil
-from diatribe.sidebar import SidebarData
 from diatribe.utils import log
 from diatribe.edits import *
+from typing import Tuple
 
 class Soundboard:
   def __init__(self, edits: list[AudioEdit] = []) -> None:
@@ -651,13 +649,27 @@ def master_audio_parts(
     dialogue_path
   )  
 
+def master_dialogue(
+    soundboard: Soundboard,
+    dialogue_path: str
+) -> None:
+  wav_path = f"{dialogue_path.replace('.mp3', '.wav')}"
+  seg.from_mp3(dialogue_path).export(wav_path, format="wav")
+  part_audio = apply_edits(wav_path, soundboard)
+  part_audio.export(wav_path, format="wav")
+  background_edit = soundboard.background()
+  if background_edit is not None and background_edit.is_enabled():
+    apply_background_audio(background_edit, wav_path)    
+  seg.from_wav(wav_path).export(dialogue_path, format="mp3")
+  os.remove(wav_path)
 
 def preview_mastered_audio(
   affected_lines: list[int], 
   lines: list[int], 
   soundboard: Soundboard, 
-  gap: int
-) -> (str, str):  
+  gap: int,
+  whole: bool = False
+) -> Tuple[str, str]:  
   src_audio_path = f"./session/{st.session_state.session_id}/final/audio"
   src_parts_path = f"./session/{st.session_state.session_id}/final/parts"
   destination_audio_path = f"./session/{st.session_state.session_id}/temp/audio"
@@ -676,20 +688,25 @@ def preview_mastered_audio(
   if os.path.exists(src_parts_path):
     shutil.copytree(src_parts_path, parts_audio_path, dirs_exist_ok=True)
   
-  master_audio_parts(
-    affected_lines,
-    lines,
-    soundboard,
-    gap,
-    parts_audio_path,
-    src_audio_path,
-    dialogue_path
-  )
+
+  original_audio = f"{src_audio_path}/dialogue.mp3"
+  if whole:
+    shutil.copy(original_audio, dialogue_path)
+    master_dialogue(soundboard, dialogue_path)
+  else:
+    master_audio_parts(
+      affected_lines,
+      lines,
+      soundboard,
+      gap,
+      parts_audio_path,
+      src_audio_path,
+      dialogue_path
+    )        
   
   if soundboard.normalization().is_enabled():
     normalize_final_audio(destination_audio_path) 
     
-  original_audio = f"{src_audio_path}/dialogue.mp3"
   return original_audio, dialogue_path
 
 
@@ -697,7 +714,8 @@ def apply_mastered_audio(
   affected_lines: list[int], 
   lines: list[int], 
   soundboard: Soundboard, 
-  gap: int
+  gap: int,
+  whole: bool = False
 ) -> None:
   src_audio_path = f"./session/{st.session_state.session_id}/final/audio"
   src_parts_path = f"./session/{st.session_state.session_id}/final/parts"
@@ -712,15 +730,18 @@ def apply_mastered_audio(
     f"{src_audio_path}/dialogue_org.mp3"
   )    
   
-  master_audio_parts(
-    affected_lines,
-    lines,
-    soundboard,
-    gap,
-    parts_audio_path,
-    destination_audio_path,
-    dialogue_path
-  )
+  if whole:
+    master_dialogue(soundboard, dialogue_path)
+  else:
+    master_audio_parts(
+      affected_lines,
+      lines,
+      soundboard,
+      gap,
+      parts_audio_path,
+      destination_audio_path,
+      dialogue_path
+    )
   
   if soundboard.normalization().is_enabled():
     normalize_final_audio(destination_audio_path) 

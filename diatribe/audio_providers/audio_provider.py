@@ -9,6 +9,10 @@ class AudioProvider(ABC):
     @abstractmethod
     def get_voice_id(self, name: str) -> str:
         pass
+
+    @abstractmethod
+    def define_creds(self) -> None:
+        pass
     
     @abstractmethod
     def define_options(self) -> Dict:
@@ -31,4 +35,4 @@ class AudioProvider(ABC):
         options: Dict,
         guidance: str = None
     ) -> str:
-        pass            
+        pass                
