@@ -35,7 +35,7 @@ if __name__ == "__main__":
     st.session_state["session_id"] = str(uuid.uuid4())  
     log("session id: " + st.session_state.session_id)
   
-  st.title("🎧 Diatribe")
+  st.title("🎧 Diatribe Dialogue")
   
   sidebar = create_sidebar()
     
@@ -55,7 +55,7 @@ if __name__ == "__main__":
         dialogue_upload = st.file_uploader(
           "Dialogue", type=["txt"]
         )         
-        submit_dialogue_upload = st.form_submit_button("Import", use_container_width=True)
+        submit_dialogue_upload = st.form_submit_button("Import", width='stretch')
         if submit_dialogue_upload and dialogue_upload:
           uploaded_dialogue = dialogue_upload.getvalue()
           saved_dialogues.convert_imported_dialogue(uploaded_dialogue)
@@ -74,7 +74,7 @@ if __name__ == "__main__":
             
     character_table = st.data_editor(
       pd.DataFrame(character_data, columns=["Name", "Voice", "Group", "Description"]),
-      use_container_width=True,
+      width='stretch',
         hide_index=True,
       num_rows="dynamic",
       key="character_table",
@@ -144,7 +144,7 @@ if __name__ == "__main__":
     
     dialogue_table = st.data_editor(
       dialogue_df,
-      use_container_width=True,
+      width='stretch',
       num_rows="dynamic",
       hide_index=True,
       key="dialogue_table",
@@ -182,7 +182,7 @@ if __name__ == "__main__":
       dialogue.sort(key=lambda x: x.line)
       
       with st.expander("Export Characters & Dialogue"):
-        prepare_download_dialogue = st.button("Prepare Download", help="This will prepare the dialogue for download.", use_container_width=True)
+        prepare_download_dialogue = st.button("Prepare Download", help="This will prepare the dialogue for download.", width='stretch')
         if prepare_download_dialogue:
           export_dialogue_path = export_dialogue(character_table, dialogue_table, sidebar.audio_provider)
           with open(export_dialogue_path, "r") as f:
@@ -191,12 +191,12 @@ if __name__ == "__main__":
               data=f,
               file_name=os.path.basename(export_dialogue_path),
               mime="text/plain",
-              use_container_width=True
+              width='stretch'
             )        
       
       # continue generated dialogue
       if sidebar.openai_api_key and not dialogue_table.empty:
-        continue_btn = st.button("Continue Dialogue", use_container_width=True, help="This uses options set in `Dialogue Generation` to continue the dialogue.")
+        continue_btn = st.button("Continue Dialogue", width='stretch', help="This uses options set in `Dialogue Generation` to continue the dialogue.")
         if continue_btn:
           generated_dialogue = create_continue_dialogue(sidebar, characters, dialogue)     
           if generated_dialogue is not None: 
@@ -211,7 +211,7 @@ if __name__ == "__main__":
         key="generate_dialogue_button_with_existing",
         css_styles=button_style
       ):
-        generate_btn = st.button("Generate Audio Dialogue", use_container_width=True, type="primary") 
+        generate_btn = st.button("Generate Audio Dialogue", width='stretch', type="primary") 
 
       if generate_btn:
         st.session_state["final_audio"] = False
@@ -321,7 +321,7 @@ if __name__ == "__main__":
           key="join_dialogue_button",
           css_styles=button_style
         ):        
-          join_dialogue = st.button("Join Dialogue", use_container_width=True, type="primary")
+          join_dialogue = st.button("Join Dialogue", width='stretch', type="primary")
         line_indices = [d.line for d in dialogue]
         if join_dialogue:          
           audio_tools.join_audio(
@@ -353,7 +353,7 @@ if __name__ == "__main__":
               data=mp3_audio, 
               file_name="dialogue.mp3", 
               mime="audio/mp3",
-              use_container_width=True,
+              width='stretch',
               type="primary"
             )
     

@@ -1,4 +1,4 @@
-import soundfile as sf, streamlit as st, os
+import soundfile as sf, streamlit as st, os, io, numpy as np
 from diatribe.audio_providers.audio_provider import AudioProvider
 from typing import List, Dict
 from kokoro import KPipeline
@@ -103,6 +103,7 @@ class KokoroProvider(AudioProvider):
             try:
                 voice_id_selected = self.get_voice_id(voice_selected)
                 st.audio(f"./samples/{voice_id_selected}.wav", format="audio/wav")
+                return {"voice_id": voice_id_selected}
             except:
                 st.toast(f"No voice sample found for {voice_selected}")
 
@@ -110,7 +111,7 @@ class KokoroProvider(AudioProvider):
     
     def define_usage(self) -> None:
         pass
-    
+
     def generate(self, text, voice_id, output_path, speed):
         os.makedirs(os.path.dirname(output_path), exist_ok=True)
         generator = pipeline(
@@ -130,9 +131,13 @@ class KokoroProvider(AudioProvider):
         options: Dict,
         guidance: str = None
     ) -> str:
-        audio_file = f"./session/{st.session_state.session_id}/audio/line{line}.wav"
+        if "test" in options:
+            audio_file = f"./session/{st.session_state.session_id}/temp/test.wav"
+        else:
+            audio_file = f"./session/{st.session_state.session_id}/audio/line{line}.wav"
         speed = options["speed"] if "speed" in options else 1.0
         self.generate(text, voice_id, audio_file, speed)
+        return audio_file
 
 if __name__ == "__main__":
     voices = get_kokoro_voices()

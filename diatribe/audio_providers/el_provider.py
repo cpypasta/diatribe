@@ -190,6 +190,8 @@ class ElevenLabsProvider(AudioProvider):
             st.audio(el_voice_details.preview_url, format="audio/mp3")
         
           st.markdown(f"_Voice ID: {el_voice_id}_")  
+          return {"voice_id": el_voice_id}
+        
         return {}           
       
     def define_usage(self):
@@ -209,7 +211,10 @@ class ElevenLabsProvider(AudioProvider):
     ) -> str:
       """Generate audio from a dialogue and save it to a file."""
       audio = generate(text, voice_id, options)
-      audio_file = f"./session/{st.session_state.session_id}/audio/line{line}.wav"
+      if "test" in options:
+          audio_file = f"./session/{st.session_state.session_id}/temp/test.wav" 
+      else:
+        audio_file = f"./session/{st.session_state.session_id}/audio/line{line}.wav"
       os.makedirs(os.path.dirname(audio_file), exist_ok=True)
       with open(audio_file, "wb") as f:
         f.write(audio)  

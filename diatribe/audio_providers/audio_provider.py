@@ -25,7 +25,7 @@ class AudioProvider(ABC):
     @abstractmethod
     def define_usage(self) -> None:
         pass
-    
+
     @abstractmethod
     def generate_and_save(
         self,

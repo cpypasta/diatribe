@@ -34,29 +34,32 @@ def get_openai_models(openai_api_key: str) -> list[str]:
   model_ids = [m.id for m in response.data]
   return sorted(model_ids)
 
+def select_audio_provider() -> AudioProvider | None:
+    audio_provider = None
+    sound_provider = st.selectbox("Engine", ["Kokoro", "ElevenLabs", "Hume AI", "Open AI", "Play AI"], index=0)
+
+    if sound_provider == "ElevenLabs":
+      audio_provider = ElevenLabsProvider()        
+    elif sound_provider == "Hume AI":    
+      audio_provider = HumeProvider()
+    elif sound_provider == "Kokoro":
+      audio_provider = KokoroProvider()
+    elif sound_provider == "Open AI":
+      audio_provider = OpenAIProvider()
+    elif sound_provider == "Play AI":
+      audio_provider = PlayAIProvider()   
+
+    return audio_provider
+
 def create_sidebar() -> SidebarData:
   """Create the streamlit sidebar."""
   with st.sidebar:    
     with st.expander("Sound Engine", expanded=True):
-      audio_provider = None
-      sound_provider = st.selectbox("Provider", ["Kokoro", "ElevenLabs", "Hume AI", "Open AI", "Play AI"], index=0)
-
-      if sound_provider == "ElevenLabs":
-        audio_provider = ElevenLabsProvider()        
-      elif sound_provider == "Hume AI":    
-        audio_provider = HumeProvider()
-      elif sound_provider == "Kokoro":
-        audio_provider = KokoroProvider()
-      elif sound_provider == "Open AI":
-        audio_provider = OpenAIProvider()
-      elif sound_provider == "Play AI":
-        audio_provider = PlayAIProvider()          
-      
-      if audio_provider:
-        audio_provider.define_creds()
-        audio_provider.define_usage()
+      audio_provider = select_audio_provider()        
     
-    if audio_provider:        
+    if audio_provider:  
+      audio_provider.define_creds()
+      audio_provider.define_usage()            
       with st.expander("Sound Options"):
         audio_provider_options = audio_provider.define_options()                                  
                     
@@ -94,7 +97,7 @@ def create_sidebar() -> SidebarData:
           help="Enable audio editing for each dialogue line. This is disabled by default to increase performance."
         )
 
-      clear_dialogue = st.button("Clear Dialogue", help=":warning: Clear everything and start over. :warning:", use_container_width=True)
+      clear_dialogue = st.button("Clear Dialogue", help=":warning: Clear everything and start over. :warning:", width='stretch')
       if clear_dialogue:
         streamlit_js_eval(js_expressions="parent.window.location.reload()")
         

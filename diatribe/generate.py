@@ -133,7 +133,7 @@ def create_dialogue_generation(sidebar: SidebarData, saves: SavedDialogueData, c
     with st.expander("Dialogue Generation"):
       if sidebar.enable_instructions:
         st.markdown("You can generate the dialogue using OpenAI. It will use the character descriptions and the plot to generate the dialogue. If you are not feeling creative, you can even have OpenAI generate the plot using the character descriptions. If you are not getting the desired number of dialogue lines, either try again or put in the plot the number of lines you desire to provide encouragement to OpenAI.")
-      generate_plot_btn = st.button("Generate Plot", use_container_width=True)
+      generate_plot_btn = st.button("Generate Plot", width='stretch')
       plot_value = ""
       if generate_plot_btn:
         with st.spinner("Generating plot..."):
@@ -162,7 +162,7 @@ def create_dialogue_generation(sidebar: SidebarData, saves: SavedDialogueData, c
       st.session_state["number_of_lines"] = number_of_lines
       generate_dialogue_btn = st.button(
         "Generate Dialogue", 
-        use_container_width=True, 
+        width='stretch', 
         disabled=(len(plot) == 0)
       )    
       

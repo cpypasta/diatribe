@@ -306,7 +306,7 @@ def create_edit_dialogue_line(line: Dialogue, audio_file: str) -> None:
     if edit_audio_line_key not in st.session_state:
         st.session_state[edit_audio_line_key] = False
      
-    edit_dialogue_line = st.button("Edit Audio", key=f"audio_edit_btn_{line.line}", use_container_width=True)
+    edit_dialogue_line = st.button("Edit Audio", key=f"audio_edit_btn_{line.line}", width='stretch')
     if edit_dialogue_line:
         st.session_state[edit_audio_line_key] = not st.session_state[edit_audio_line_key] 
         
@@ -399,7 +399,7 @@ def create_edit_dialogue_line(line: Dialogue, audio_file: str) -> None:
                             key=f"upload_effect_{line.line}",
                             label_visibility="collapsed"
                         )
-                        submit_uploaded_special_effect = st.form_submit_button("Upload", use_container_width=True)
+                        submit_uploaded_special_effect = st.form_submit_button("Upload", width='stretch')
                         if uploaded_special_effect and submit_uploaded_special_effect:
                             if uploaded_special_effect:
                                 audio_file = uploaded_special_effect.getvalue()
@@ -417,7 +417,7 @@ def create_edit_dialogue_line(line: Dialogue, audio_file: str) -> None:
                         key=f"effect_{line.line}"
                     )
                 with col2:
-                    st.button("Refresh", use_container_width=True, key=f"refresh_effect_{line.line}")
+                    st.button("Refresh", width='stretch', key=f"refresh_effect_{line.line}")
                     
                 if effect_name:
                     effect_path = audio_tools.get_effect_path(effect_name)
@@ -474,7 +474,7 @@ def create_edit_dialogue_line(line: Dialogue, audio_file: str) -> None:
             with st.form(f"preview_edit_{line.line}", clear_on_submit=False, border=False):
                 preview_line = st.form_submit_button(
                     "Preview", 
-                    use_container_width=True
+                    width='stretch'
                 )
                 if preview_line:
                     preview_audio = audio_tools.preview_audio(
@@ -502,7 +502,7 @@ def create_edit_dialogue_line(line: Dialogue, audio_file: str) -> None:
             with st.form(f"apply_edit_{line.line}", clear_on_submit=False, border=False):                                        
                 apply_edits = st.form_submit_button(
                     "Apply", 
-                    use_container_width=True
+                    width='stretch'
                 )
                 if apply_edits:
                     new_line_audio = audio_tools.edit_audio(
@@ -519,7 +519,7 @@ def create_edit_diatribe(sidebar: SidebarData, characters: list[Character], dial
     if "background_edit" not in st.session_state:
         st.session_state["background_edit"] = False
         
-    edit_background_btn = st.button("Edit Audio", use_container_width=True, key="background_edit_btn")
+    edit_background_btn = st.button("Edit Audio", width='stretch', key="background_edit_btn")
     if edit_background_btn:
         st.session_state["background_edit"] = not st.session_state["background_edit"]
     
@@ -586,7 +586,7 @@ def create_edit_diatribe(sidebar: SidebarData, characters: list[Character], dial
                                 key="upload_soundtrack",
                                 label_visibility="collapsed"
                             )
-                            submit_uploaded_soundtrack = st.form_submit_button("Upload", use_container_width=True)
+                            submit_uploaded_soundtrack = st.form_submit_button("Upload", width='stretch')
                             if uploaded_soundtrack and submit_uploaded_soundtrack:
                                 if uploaded_soundtrack:
                                     audio_file = uploaded_soundtrack.getvalue()
@@ -603,7 +603,7 @@ def create_edit_diatribe(sidebar: SidebarData, characters: list[Character], dial
                             label_visibility="collapsed"
                         )
                     with col2:
-                        st.button("Refresh", use_container_width=True, key="refresh_background")
+                        st.button("Refresh", width='stretch', key="refresh_background")
                         
                     if background_audio:
                         st.audio(audio_tools.get_background_path(background_audio))
@@ -630,7 +630,7 @@ def create_edit_diatribe(sidebar: SidebarData, characters: list[Character], dial
                     soundboard.add(BackgroundEdit(background_audio, fade_in, fade_out, lower_db))                          
                 
             st.divider()
-            preview_background_bnt = st.button("Preview", use_container_width=True)
+            preview_background_bnt = st.button("Preview", width='stretch')
             if preview_background_bnt:
                 with st.spinner("Mastering audio..."):
                     original_audio, updated_audio = audio_tools.preview_mastered_audio(
@@ -655,7 +655,7 @@ def create_edit_diatribe(sidebar: SidebarData, characters: list[Character], dial
                     _, plot = audio_tools.generate_waveform_from_file(updated_audio, y_max)
                     st.pyplot(plot)              
                     
-            add_background_btn = st.button("Apply", use_container_width=True)
+            add_background_btn = st.button("Apply", width='stretch')
             if add_background_btn:
                 with st.spinner("Mastering audio..."):
                     audio_tools.apply_mastered_audio(

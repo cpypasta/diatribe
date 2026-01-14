@@ -68,7 +68,7 @@ def create_saved_dialogues():
         placeholder="Select a project",
         label_visibility="collapsed"
       )
-      submit_sample_project = st.form_submit_button("Load", use_container_width=True)
+      submit_sample_project = st.form_submit_button("Load", width='stretch')
       if submit_sample_project and selected_save_name:
         project_path = f"./saves/{selected_save_name.replace(' ', '_')}.zip"
         unzip_path = unzip_package(open(project_path, "rb").read())
@@ -78,7 +78,7 @@ def create_saved_dialogues():
     with import_tab:
       with st.form("Import Project", clear_on_submit=True, border=False):
         imported_project = st.file_uploader("Project", type=["zip"])
-        submit_upload_project = st.form_submit_button("Import", use_container_width=True)
+        submit_upload_project = st.form_submit_button("Import", width='stretch')
         if imported_project and submit_upload_project:
           with st.spinner("Importing project..."):
             bytes_data = imported_project.getvalue()
@@ -86,7 +86,7 @@ def create_saved_dialogues():
             import_project(package_path)
             
     with export_tab:
-      prepare_project=st.button("Prepare Download", use_container_width=True, help="Prepare the dialogue and audio for export")
+      prepare_project=st.button("Prepare Download", width='stretch', help="Prepare the dialogue and audio for export")
       
       download_dialogue_path = f"./session/{st.session_state.session_id}/project/project.zip"
       if os.path.exists(download_dialogue_path):         
@@ -96,7 +96,7 @@ def create_saved_dialogues():
             data=f, 
             file_name="project.zip", 
             mime="application/zip",
-            use_container_width=True
+            width='stretch'
           )
         if dialogue_downloaded:
           os.remove(download_dialogue_path)
