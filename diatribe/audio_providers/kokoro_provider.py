@@ -129,7 +129,7 @@ class KokoroProvider(AudioProvider):
         voice_id: str,
         line: int,
         options: Dict,
-        guidance: str = None
+        guidance: str | None = None
     ) -> str:
         if "test" in options:
             audio_file = f"./session/{st.session_state.session_id}/temp/test.wav"

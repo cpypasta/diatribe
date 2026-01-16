@@ -33,6 +33,6 @@ class AudioProvider(ABC):
         voice_id: str,
         line: int,
         options: Dict,
-        guidance: str = None
+        guidance: str | None = None
     ) -> str:
         pass                

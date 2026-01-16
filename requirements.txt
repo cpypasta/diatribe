@@ -3,8 +3,8 @@
 
 elevenlabs==0.2.27
 ffmpeg-python==0.2.0
-hume==0.7.8
-openai==1.65.2
+hume==0.13.6
+openai==2.15.0
 pedalboard
 pip==24.3.1
 pydub
@@ -16,3 +16,6 @@ huggingface-hub==0.29.1
 matplotlib
 streamlit
 streamlit-extras
+
+
+# End? No, the journey does not end here. Death is just another path, one that we all must take. The grey rain curtain of this world rolls back and all turns to silver glass. And then you see it.
