@@ -1,56 +1,70 @@
 import os, streamlit as st
-from diatribe.audio_providers.audio_provider import AudioProvider
+from diatribe.audio_providers.audio_provider import AudioProvider, Location
+from diatribe.data import AIVoice, Gender
 from typing import List, Dict
 from enum import Enum
 from openai import OpenAI
 from dataclasses import dataclass
 from diatribe.utils import get_env_key
 
-class Gender(Enum):
-    MALE = "Male"
-    FEMALE = "Female"
-
-@dataclass
-class AIVoice:
-    name: str
-    id: str
-    gender: Gender
-
-# TODO: new voices only work with gpt-4o-mini-tts model
+all_models = ["tts-1", "tts-1-hd", "gpt-4o-mini-tts"]
+latest_models = ["gpt-4o-mini-tts"]
 class OpenAIVoice(Enum):
-    ALLOY = AIVoice("Alloy", "alloy", Gender.FEMALE)
-    ASH = AIVoice("Ash", "ash", Gender.MALE)    
-    BALLAD = AIVoice("Ballad", "ballad", Gender.MALE) #
-    CORAL = AIVoice("Coral", "coral", Gender.FEMALE)
-    ECHO = AIVoice("Echo", "echo", Gender.MALE)
-    FABLE = AIVoice("Fable", "fable", Gender.FEMALE)
-    NOVA = AIVoice("Nova", "nova", Gender.FEMALE)
-    ONYX = AIVoice("Onyx", "onyx", Gender.MALE)
-    SAGE = AIVoice("Sage", "sage", Gender.FEMALE)
-    SHIMMER = AIVoice("Shimmer", "shimmer", Gender.FEMALE)
-    VERSE = AIVoice("Verse", "verse", Gender.MALE) #
-    MARIN = AIVoice("Marin", "marin", Gender.FEMALE) #
-    CEDAR = AIVoice("Cedar", "cedar", Gender.MALE) #
+    ALLOY = AIVoice("Alloy", "alloy", gender=Gender.FEMALE, models=all_models)
+    ASH = AIVoice("Ash", "ash", gender=Gender.MALE, models=all_models)    
+    BALLAD = AIVoice("Ballad", "ballad", gender=Gender.MALE, models=latest_models)
+    CORAL = AIVoice("Coral", "coral", gender=Gender.FEMALE, models=all_models)
+    ECHO = AIVoice("Echo", "echo", gender=Gender.MALE, models=all_models)
+    FABLE = AIVoice("Fable", "fable", gender=Gender.FEMALE, models=all_models)
+    NOVA = AIVoice("Nova", "nova", gender=Gender.FEMALE, models=all_models)
+    ONYX = AIVoice("Onyx", "onyx", gender=Gender.MALE, models=all_models)
+    SAGE = AIVoice("Sage", "sage", gender=Gender.FEMALE, models=all_models)
+    SHIMMER = AIVoice("Shimmer", "shimmer", gender=Gender.FEMALE, models=all_models)
+    VERSE = AIVoice("Verse", "verse", gender=Gender.MALE, models=latest_models)
+    MARIN = AIVoice("Marin", "marin", gender=Gender.FEMALE, models=latest_models)
+    CEDAR = AIVoice("Cedar", "cedar", gender=Gender.MALE, models=latest_models)
+
 class OpenAIProvider(AudioProvider):
+    def __init__(self) -> None:
+        self.openai_voices = [voice.value for voice in OpenAIVoice]
+        self.voice_names = sorted([voice.name for voice in self.openai_voices])
+
+    @property
+    def name(self) -> str:
+        return "Open AI"
+
+    @property
+    def description(self) -> str:
+        return "Open AI offers fast and natural speech built on the GPT-4o mini model with an estimated 1 billion parameter model."
+
+    @property
+    def supports_instructions(self) -> bool:
+        return True
+
+    @property
+    def voices(self) -> List[AIVoice]:
+        return self.openai_voices
+
+    @property
+    def location(self) -> Location:
+        return Location.HOSTED
+
     def get_voice_names(self) -> List[str]:
-        voices = [voice for voice in OpenAIVoice]
-        return [voice.value.name for voice in voices]
+        return self.voice_names
     
     def get_voice_id(self, name: str) -> str:
-        voice = next((voice.value.id for voice in OpenAIVoice if voice.value.name == name), None)
-        if voice is None:
-            raise Exception(f"Voice ID not found for voice name: {name}")
-        return voice
+        return super().get_voice_id(name)
     
     def define_creds(self) -> None:
         openai_key_value = get_env_key("OPENAI_API_KEY", "openai_key_value")
-        openai_key = st.text_input("OpenAI API Key", openai_key_value, type="password", key="openai_provider_key")
+        openai_key = st.text_input("API Key", openai_key_value, type="password", key="openai_provider_key")
         if openai_key:
           st.session_state["openai_key_value"] = openai_key
     
     def define_options(self) -> Dict:
-        models = ["tts-1", "tts-1-hd", "gpt-4o-mini-tts"]
+        models = all_models
         model_seleced = st.selectbox("Speech Model", models, index=2)
+        self.model = model_seleced
 
         voice_speed = st.slider("Voice Speed", 0.25, 4.0, 1.0, 0.25)
 
@@ -61,36 +75,20 @@ class OpenAIProvider(AudioProvider):
         }
     
     def define_voice_explorer(self) -> Dict:
-        voice_genders = set([voice.value.gender.value for voice in OpenAIVoice])
-        voice_gender_selected = st.selectbox("Gender Filter", voice_genders, index=None)
-
-        if voice_gender_selected:
-            filtered_voice_names = [voice.value.name for voice in OpenAIVoice if voice.value.gender.value == voice_gender_selected]
-        else:
-            filtered_voice_names = self.get_voice_names()
-            
-        voice_selected = st.selectbox("Speaker", filtered_voice_names)        
-        if voice_selected:
-            voice_id_selected = self.get_voice_id(voice_selected)
-            sample_path = f"./samples/openai/{voice_id_selected}.wav"
-            if os.path.exists(sample_path):
-                st.audio(sample_path, format="audio/wav")
-
-        return {
-            "voice_id": voice_id_selected
-        }
+        return self._show_voices(["gender"], sample_path="openai", model=self.model)
     
     def define_usage(self) -> Dict:
         return {}
     
-    def generate(self, text, voice_id, api_key, model_id, speed, output_path):
+    def generate(self, text, voice_id, instructions, api_key, model_id, speed, output_path):
         client = OpenAI(api_key=api_key)
         response = client.audio.speech.create(
             model=model_id,
             voice=voice_id,
             input=text,
             response_format="wav",
-            speed=speed
+            speed=speed,
+            instructions=instructions
         )
         response.write_to_file(output_path)        
 
@@ -105,25 +103,13 @@ class OpenAIProvider(AudioProvider):
         api_key = options["api_key"]
         model_id = options["model_id"]
         speed = options["speed"]
-
+        print(guidance)
         if "test" in options:
             audio_file = f"./session/{st.session_state.session_id}/temp/test.wav"
         else:
             audio_file = f"./session/{st.session_state.session_id}/audio/line{line}.wav"
 
         os.makedirs(os.path.dirname(audio_file), exist_ok=True)
-        self.generate(text, voice_id, api_key, model_id, speed, audio_file)
+        self.generate(text, voice_id, guidance, api_key, model_id, speed, audio_file)
         return audio_file
-
-if __name__ == "__main__":
-    from dotenv import load_dotenv
-    load_dotenv()
-    provider = OpenAIProvider()
-    provider.generate(
-        "this is me", 
-        OpenAIVoice.ALLOY.value.id, 
-        os.environ["OPENAI_API_KEY"],
-        "tts-1-hd",
-        "sample.wav"
-    )
     

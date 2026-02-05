@@ -1,23 +1,13 @@
 import os, base64, json
 import streamlit as st
 from hume import HumeClient
-from hume.tts.types import VoiceProvider
 from hume.core.api_error import ApiError
 from hume.tts import PostedUtterance, PostedUtteranceVoiceWithName, ReturnGeneration
 from enum import Enum
 from typing import List, Dict
-from diatribe.audio_providers.audio_provider import AudioProvider
+from diatribe.audio_providers.audio_provider import AudioProvider, Location
 from diatribe.utils import get_env_key
-from dataclasses import dataclass
-
-@dataclass
-class AIVoice:
-    name: str
-    id: str
-    gender: str | None
-    accent: str | None
-    provider: VoiceProvider
-    versions: List[str] | None
+from diatribe.data import AIVoice, Gender, Source
 
 @st.cache_data
 def get_voices() -> List[AIVoice]:
@@ -32,14 +22,19 @@ def get_voices() -> List[AIVoice]:
             AIVoice(
                 voice.name, 
                 voice.id, 
-                voice.tags["GENDER"][0] if "GENDER" in voice.tags else None, 
-                voice.tags["ACCENT"][0] if "ACCENT" in voice.tags else None,
-                voice.provider,
-                voice.compatible_octave_models
+                gender=Gender(voice.tags["GENDER"][0]) if "GENDER" in voice.tags else None, 
+                accent=voice.tags["ACCENT"][0] if "ACCENT" in voice.tags else None,
+                source=Source.CUSTOM if voice.provider == "CUSTOM_VOICE" else Source.PROVIDED,
+                models=voice.compatible_octave_models if voice.compatible_octave_models else []
             )
             for voice in all_hume_voices
         ]
         return ai_voices
+    except ApiError as e:
+        if e.status_code == 429:
+            raise Exception("You have reached your Hume API rate limit. Please try again later.")
+        else:
+            raise Exception(f"Hume API error: {e.body}")     
     except Exception as e:
         print(e)
         raise Exception("Failed to get Hume voices")            
@@ -61,7 +56,10 @@ def generate(
                 PostedUtterance(
                     text=text,
                     description=guidance,
-                    voice=PostedUtteranceVoiceWithName(name=voice.name, provider=voice.provider)
+                    voice=PostedUtteranceVoiceWithName(
+                        name=voice.name, 
+                        provider="CUSTOM_VOICE" if voice.source == Source.CUSTOM else "HUME_AI"
+                    )
                 )
             ],
             version=version
@@ -74,29 +72,39 @@ def generate(
             raise Exception(f"Hume API error: {e.body}")  
     
 class HumeProvider(AudioProvider):
-    def __init__(self):
-        try:
-            self.voices = get_voices()
-        except:
-            st.toast("Unable to fetch Hume voices", icon="👎")
-            self.voices = []
-        self.voice_names = sorted([v.name for v in self.voices])
+    @property
+    def name(self) -> str:
+        return "Hume AI"
 
-    def get_voice_from_name(self, name: str) -> AIVoice | None:
-        return next((voice for voice in self.voices if voice.name == name), None)
+    @property
+    def description(self) -> str:
+        return "Hume AI offers natural and emotive speech with likely billions of parameters."
 
+    @property
+    def voices(self) -> List[AIVoice]:
+        if not hasattr(self, "hume_voices"):
+            try:
+                self.hume_voices = get_voices()
+            except Exception as ex:
+                st.toast(ex, icon="👎")
+                self.hume_voices = []                
+        return self.hume_voices
+    
+    @property
+    def location(self) -> Location:
+        return Location.HOSTED
+
+    def get_voice_id(self, name: str) -> str:
+        return super().get_voice_id(name)
+    
     def get_voice_names(self) -> List[str]:
+        if not hasattr(self, "voice_names"):
+            self.voice_names = sorted([v.name for v in self.voices])
         return self.voice_names
-    
-    def get_voice_id(self, name) -> str:
-        voice = self.get_voice_from_name(name)
-        if voice is None:
-            raise Exception(f"Voice ID not found for voice name: {name}")
-        return name
-    
+
     def define_creds(self) -> None:
         hume_key_value = get_env_key("HUME_API_KEY", "hume_key_value")
-        hume_key = st.text_input("Hume API Key", hume_key_value, type="password", key="hume_key")        
+        hume_key = st.text_input("API Key", hume_key_value, type="password", key="hume_key")        
         if hume_key:
           st.session_state["hume_key_value"] = hume_key 
 
@@ -113,39 +121,7 @@ class HumeProvider(AudioProvider):
         }
         
     def define_voice_explorer(self) -> Dict:
-        voice_genders = set([self.voice.gender for self.voice in self.voices if self.voice.gender])
-        voice_gender_selected = st.selectbox("Gender Filter", voice_genders, index=None)
-
-        voice_accents = sorted(set([voice.accent for voice in self.voices if voice.accent]))
-        voice_accent_selected = st.selectbox("Accent Filter", voice_accents, index=None)
-
-        if voice_gender_selected:
-            filtered_voices = [voice for voice in self.voices if voice.gender == voice_gender_selected]
-        else:
-            filtered_voices = self.voices
-
-        if voice_accent_selected:
-            filtered_voices = [voice for voice in filtered_voices if voice.accent == voice_accent_selected]
-
-        filtered_voices = [voice for voice in filtered_voices if voice.versions and self.version in voice.versions]
-
-        filtered_voice_names = sorted([voice.name for voice in filtered_voices])
-        voice_selected = st.selectbox("Speaker", filtered_voice_names)  
-        
-        voice_id = None
-        if voice_selected:
-            try:
-                voice_id = self.get_voice_id(voice_selected)
-            except:
-                st.toast(f"Unable to find voice ID for {voice_selected}")
-
-            sample_path = f"./samples/{voice_id}.wav"
-            if os.path.exists(sample_path):
-                st.audio(sample_path, format="audio/wav")
-
-        return {
-            "voice_id": voice_id
-        }
+        return self._show_voices(["gender", "accent"], sample_path="hume", model=self.version)
     
     def define_usage(self):
         return None
@@ -161,7 +137,7 @@ class HumeProvider(AudioProvider):
         """Generate audio from a dialogue and save it to a file."""
         speech = generate(
             text, 
-            self.get_voice_from_name(voice_id), 
+            self._get_voice_by_id(voice_id), 
             options["version"], 
             api_key=options["api_key"], 
             guidance=guidance

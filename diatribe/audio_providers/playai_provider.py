@@ -7,16 +7,7 @@ from diatribe.dialogues import Dialogue
 from pathlib import Path
 from dataclasses import dataclass
 from diatribe.utils import get_env_key
-
-class Gender(Enum):
-    MALE = "Male"
-    FEMALE = "Female"
-
-@dataclass
-class AIVoice:
-    name: str
-    id: str
-    gender: Gender
+from diatribe.data import AIVoice, Gender
 
 class PlayAIVoice(Enum):
     ANGELO = AIVoice("Angelo", "s3://voice-cloning-zero-shot/baf1ef41-36b6-428c-9bdf-50ba54682bd8/original/manifest.json", Gender.MALE)

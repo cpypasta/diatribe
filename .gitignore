@@ -12,3 +12,5 @@ session
 venv
 env
 __pycache__
+*_output*
+output.wav

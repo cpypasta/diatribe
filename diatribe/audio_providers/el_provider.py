@@ -1,96 +1,77 @@
 import elevenlabs as el, streamlit as st, re, os, traceback, datetime
+from elevenlabs.client import ElevenLabs
 from typing import List, Dict
-from diatribe.audio_providers.audio_provider import AudioProvider
+from diatribe.audio_providers.audio_provider import AudioProvider, Location
 from diatribe.utils import get_env_key
-from elevenlabs import Voice, Models, Model, VoiceSettings, User
+from elevenlabs import VoiceSettings
+from elevenlabs.types import Voice, Model
+from diatribe.data import AIVoice, Gender
 
 @st.cache_data
-def get_voices() -> List[Voice]:
-  voices: list[Voice] = list(el.voices())
-  voices.sort(key=lambda x: x.name)
-  return voices
+def get_voices(api_key) -> List[AIVoice]:
+  voices: list[Voice] = ElevenLabs(api_key=api_key).voices.get_all().voices  
+  genders = {m.value for m in Gender}
+
+  def get_gender(labels: Dict | None) -> Gender | None:
+    if not labels:
+      return None
+    value = labels.get("gender")
+    return Gender(value.capitalize()) if value and value.capitalize() in genders else None
+
+  def get_label(label: str, labels: Dict | None) -> str | None:
+    if not labels:
+      return None
+    return labels.get(label)
+
+  ai_voices = [
+    AIVoice(
+      str(voice.name), 
+      voice.voice_id,
+      gender=get_gender(voice.labels),
+      accent=get_label("accent", voice.labels),
+      age=get_label("age", voice.labels),
+      models=voice.high_quality_base_model_ids if voice.high_quality_base_model_ids else [],
+      cloned=(voice.category == "cloned"),
+      sample_url=voice.preview_url
+    )
+    for voice in voices
+  ]
+  return ai_voices
 
 @st.cache_data
-def get_models() -> List[Model]:
-  return list(Models.from_api())
+def get_models(api_key) -> List[Model]:
+  models = ElevenLabs(api_key=api_key).models.list()
+  return models   
+    
 
-def extract_name(s: str) -> str:
-  """Extract the voice name from the voice name with (cloned) suffix."""
-  match = re.match(r"(.*?)( \(cloned\))?$", s)
-  if match:
-    return match.group(1)
-  return s  
-    
-def get_voice_by_name(name: str, voices: list[Voice]) -> Voice:
-  """Get a voice by the voice name."""
-  name = extract_name(name)
-  return next((v for v in voices if v.name == name), None)    
-    
-def get_voice_id(voice_name: str, voices: list[Voice]) -> str:
-  """Get the voice ID from the voice name."""
-  voice_name = extract_name(voice_name)
-  voice_index = next((i for i, v in enumerate(voices) if v.name == voice_name), None)
-  if voice_index is not None:
-    return voices[voice_index].voice_id
-  else:
-    return None    
-    
-def voice_names_with_filter(
-  voices: list[Voice], 
-  gender: str, 
-  age: str, 
-  accent: str, 
-  cloned: bool
-) -> list[str]:
-  """Get a list of voice names filtered by gender, age, accent, and cloned."""
-  voice_names = []
-  for v in voices:
-    v_labels = v.labels
-    v_gender = v_labels["gender"] if "gender" in v_labels else None
-    v_age = v_labels["age"] if "age" in v_labels else None
-    v_acccent = v_labels["accent"] if "accent" in v_labels else None
-    match = True
-    if gender and v_gender != gender:
-      match = False
-    if age and v_age != age:
-      match = False
-    if accent and v_acccent != accent:
-      match = False
-    if cloned:
-      if v.category != "cloned":
-        match = False
-    if match:
-      voice_names.append(f"{v.name} ({v.category})" if v.category == "cloned" else v.name)
-  return voice_names    
-    
 def generate(
   text: str,
   voice_id: str,
-  options: Dict 
+  options: Dict,
+  api_key: str
 ) -> bytes:
   """Generate audio from a dialogue."""
   try:
-    audio = el.generate(
+    audio = ElevenLabs(api_key=api_key).text_to_speech.convert(
+      voice_id=voice_id,
+      output_format=options["output_format"], # TextToSpeechConvertRequestOutputFormat
       text=text,
-      model=options["model_id"],
-      voice = Voice(
-        voice_id=voice_id,
-        settings=VoiceSettings(
-          stability=options["stability"],
-          similarity_boost=options["similarity_boost"],
-          style=options["style"]
-        )
-      )
-    ) 
+      model_id=options["model_id"],
+      voice_settings=VoiceSettings(
+        stability=options["stability"],
+        similarity_boost=options["similarity_boost"],
+        style=options["style"]
+      )     
+    )
   except:
     traceback.print_exc()
     raise Exception("Failed to generate ElevenLabs audio.")
-  return audio    
+  return b''.join(audio)    
     
 @st.cache_data(ttl=900)
-def get_usage_percent() -> dict:
+def get_usage_percent(api_key) -> dict:
   """Get the character usage percent from the Eleven Labs API."""
-  user_info = User.from_api()
+  user_info = ElevenLabs(api_key=api_key).user.get()
   percent = user_info.subscription.character_count / user_info.subscription.character_limit * 100
   resets = user_info.subscription.next_character_count_reset_unix
   resets = datetime.datetime.fromtimestamp(resets).strftime("%m/%d")
@@ -102,26 +83,47 @@ def get_usage_percent() -> dict:
   }
           
 class ElevenLabsProvider(AudioProvider):
+    @property
+    def name(self) -> str:
+        return "ElevenLabs"    
+
+    @property
+    def description(self) -> str:
+        return "ElevenLabs is a leading provider of TTS models."
+
+    @property
+    def has_usage(self) -> bool:
+        return True
+
+    @property
+    def voices(self) -> List[AIVoice]:
+        if not hasattr(self, "el_voices"):
+            self.el_voices = get_voices(self.api_key)
+        return self.el_voices
+
+    @property
+    def location(self) -> Location:
+        return Location.HOSTED
+
     def get_voice_names(self) -> List[str]:
-        el_voices = get_voices()
-        return [f"{voice.name}{' (cloned)' if voice.category == 'cloned' else ''}" for voice in el_voices]
+        if self.voice_names:
+            return self.voice_names
+        self.el_voices = get_voices(self.api_key)
+        self.voice_names = sorted([voice.name for voice in self.voices])
+        return self.voice_names
       
     def get_voice_id(self, name) -> str:
-      voices = get_voices()
-      voice_id = get_voice_id(name, voices)
-      if voice_id is None:
-        raise Exception(f"Voice ID not found for voice name: {name}")
-      return voice_id
+      return super().get_voice_id(name)
       
     def define_creds(self) -> None:
       el_key_value = get_env_key("ELEVENLABS_API_KEY", "el_key_value")
-      el_key = st.text_input("ElevenLabs API Key", el_key_value, type="password", key="el_key")  
+      el_key = st.text_input("API Key", el_key_value, type="password", key="el_key")  
       if el_key:
-        el.set_api_key(el_key)  
-        st.session_state["el_key_value"] = el_key        
+        st.session_state["el_key_value"] = el_key    
+      self.api_key = get_env_key("ELEVENLABS_API_KEY", "el_key_value")  
 
     def define_options(self) -> Dict:
-        models = get_models()
+        models = get_models(self.api_key)
         model_ids = [m.model_id for m in models]
         model_names = [m.name for m in models]
         try:
@@ -132,7 +134,18 @@ class ElevenLabsProvider(AudioProvider):
         if model_name:
           model_index = model_names.index(model_name)
           model_id = model_ids[model_index]   
-                           
+          self.model_id = model_id
+
+        audio_format = st.selectbox(
+          "Audio Format",
+          [
+            "mp3_44100_128",
+            "opus_48000_128",
+            "pcm_44100",
+            "wav_44100"
+          ],
+          index=0
+        )
         stability = st.slider(
           "Stability", 
           0.0, 
@@ -156,6 +169,7 @@ class ElevenLabsProvider(AudioProvider):
         )         
         
         return {
+          "output_format": audio_format,
           "model_id": model_id,
           "stability": stability,
           "similarity_boost": simarlity_boost,
@@ -163,39 +177,10 @@ class ElevenLabsProvider(AudioProvider):
         }
         
     def define_voice_explorer(self) -> Dict:
-        el_voices = get_voices()
-        el_voice_accents = set([voice.labels["accent"] for voice in el_voices if "accent" in voice.labels])
-        el_voice_ages = set([voice.labels["age"] for voice in el_voices if "age" in voice.labels])
-        el_voice_genders = set([voice.labels["gender"] for voice in el_voices if "gender" in voice.labels])
-        el_voice_accents = sorted(el_voice_accents, key=lambda x: x.lower())
-        
-        el_voice_cloned = st.toggle("Cloned Voices Only", value=False)
-        el_voice_gender = st.selectbox("Gender Filter", el_voice_genders, index=None)
-        el_voice_age = st.selectbox("Age Filter", el_voice_ages, index=None)
-        el_voice_accent = st.selectbox("Accent Filter", el_voice_accents, index=None)
-        
-        speaker_voice_names = voice_names_with_filter(
-          el_voices, 
-          el_voice_gender, 
-          el_voice_age, 
-          el_voice_accent,
-          el_voice_cloned
-        )
-        el_voice = st.selectbox("Speaker", speaker_voice_names)
-        if el_voice:
-          el_voice_details = get_voice_by_name(el_voice, el_voices)
-          el_voice_id = el_voice_details.voice_id
-          
-          if el_voice_details.preview_url:
-            st.audio(el_voice_details.preview_url, format="audio/mp3")
-        
-          st.markdown(f"_Voice ID: {el_voice_id}_")  
-          return {"voice_id": el_voice_id}
-        
-        return {}           
+        return self._show_voices(["gender", "age", "accent", "cloned"], model=self.model_id)
       
     def define_usage(self):
-      usage = get_usage_percent()
+      usage = get_usage_percent(self.api_key)
       st.markdown(f"**Character Percent:** {usage['usage']:.1f}%")
       st.markdown(f"**Character Count:** {usage['count']:,}")
       st.markdown(f"**Character Limit:** {usage['limit']:,}")
@@ -207,10 +192,10 @@ class ElevenLabsProvider(AudioProvider):
       voice_id: str,
       line: int,
       options: Dict,
-      guidance: str = None
+      guidance: str | None = None
     ) -> str:
       """Generate audio from a dialogue and save it to a file."""
-      audio = generate(text, voice_id, options)
+      audio = generate(text, voice_id, options, self.api_key)
       if "test" in options:
           audio_file = f"./session/{st.session_state.session_id}/temp/test.wav" 
       else:

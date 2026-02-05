@@ -1,21 +1,38 @@
-# python 3.12.11
-# need to install ffmpeg on host machine (`brew install ffmpeg` on macOS)
+# python 3.12.11 (doesn't work with chatterbox)
+# python 3.11.13
 
-elevenlabs==0.2.27
-ffmpeg-python==0.2.0
-hume==0.13.6
-openai==2.15.0
+elevenlabs
+ffmpeg-python # brew install ffmpeg
+hume
+openai
 pedalboard
-pip==24.3.1
+pip
 pydub
-python-dotenv==1.0.0
+python-dotenv
 streamlit-js-eval
-soundfile==0.13.1
+soundfile
 kokoro
-huggingface-hub==0.29.1
+huggingface-hub
 matplotlib
 streamlit
 streamlit-extras
+accelerate
+coqui-tts # brew install xz
+torchcodec
+chatterbox-tts # needs local huggingface-cli token
 
+# PARLER
+# install parler-tts separately since it conflicts with streamlit-extras
+
+# PIPER
+# brew install cmake ninja pkg-config nspeak-ng
+# git clone https://github.com/OHF-Voice/piper1-gpl
+# ... piper venv
+# pip install --upgrade pip setuptools wheel scikit-build-core cmake
+# pip install -e .
+# pip install build
+# python -m build --wheel
+# ... diatribe venv
+# pip install ../piper1-gpl/dist/piper-*.whl
 
 # End? No, the journey does not end here. Death is just another path, one that we all must take. The grey rain curtain of this world rolls back and all turns to silver glass. And then you see it.
